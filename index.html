@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>2018新地环境抽奖现场</title>
+    <style>
+        html,
+        body {
+            height: 100%;
+        }
+        
+        body {
+            background-color: rgba(0, 0, 0, 0);
+            margin: 0;
+            font-family: Helvetica, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            height: 100%;
+            width: 100%;
+            background-image: url(image/stars.jpg);
+            background-repeat: no-repeat;
+            background-size: 100% 100%;
+        }
+        
+        .fly-element {
+            width: 12px;
+            height: 7px;
+            box-shadow: 0px 0px 12px rgba(0, 255, 255, 0.5);
+            text-align: center;
+            cursor: default;
+            background-repeat: no-repeat;
+            background-size: 100% 100%;
+            transform: rotate(180deg);
+        }
+        
+        .element,
+        .wins {
+            width: 120px;
+            height: 160px;
+            box-shadow: 0px 0px 12px rgba(0, 255, 255, 0.5);
+            border: 1px solid rgba(127, 255, 255, 0.25);
+            text-align: center;
+            cursor: default;
+            transform-style: preserve-3d;
+        }
+        
+        .wins {
+            opacity: 0;
+            z-index: 9;
+            position: absolute;
+            top: calc(50% - 80px);
+            left: calc(50% - 60px);
+            transform: scale(1);
+        }
+        
+        .element>.front,
+        .wins>.front {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+        }
+        
+        .element>.back,
+        .wins>.back {
+            width: 100%;
+            height: 100%;
+            background-image: url(image/back_logo.png);
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            backface-visibility: hidden;
+            transform: rotateY(180deg);
+        }
+        
+        .element p,
+        .wins p {
+            color: #8cb513;
+            font-family: '楷体';
+            font-size: 35px;
+            font-style: italic;
+            text-align: center;
+            height: 100%;
+            width: 100%;
+            font-weight: 900;
+            writing-mode: vertical-lr;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="http://www.jq22.com/jquery/jquery-2.1.1.js"></script>
+    <script src="https://threejs.org/build/three.js"></script>
+    <script src="js/tween.min.js"></script>
+    <script src="js/TrackballControls.js"></script>
+    <script src="js/CSS3DRenderer.js"></script>
+
+    <div id="container"></div>
+    <script>
+        var staffs = [];
+        var wins = [];
+
+        var rs, vi, ry;
+
+        var camera, scene, renderer, controls;
+        var objects = [];
+        var targets = {
+            table: [],
+            sphere: [],
+            helix: [],
+            grid: [],
+            bang: [],
+        };
+
+        (function() {
+            //创建相机
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000);
+            camera.position.z = 3000;
+            //创建场景
+            scene = new THREE.Scene();
+            //渲染
+            renderer = new THREE.CSS3DRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.domElement.style.position = 'absolute';
+            document.getElementById('container').appendChild(renderer.domElement);
+            // 鼠标控制
+            controls = new THREE.TrackballControls(camera, renderer.domElement);
+            controls.rotateSpeed = 0.5;
+            controls.minDistance = 500;
+            controls.maxDistance = 6000;
+            controls.addEventListener('change', render);
+
+            startAnimate(targets.bang, true);
+            animate();
+        })();
+
+        //添加键盘监听
+        window.addEventListener('keydown', function(e) {
+            switch (e.keyCode) {
+                case 76: //l,幸运奖
+                    startLottery(true);
+                    break;
+                case 83: //s,开始
+                    startLottery(false);
+                    break;
+                case 32: //space,停并抽取人员
+                    randomStaff();
+                    lottery();
+                    break;
+                default:
+                    break;
+            }
+
+        });
+
+        window.addEventListener('resize', onWindowResize, false);
+
+        function startAnimate(target, rotateYOnly) {
+            init(target);
+            if (rotateYOnly) {
+                scene.rotation.x = 0;
+                scene.rotation.z = 0;
+                rotateY();
+            } else {
+                if (ry) cancelAnimationFrame(ry);
+                rotateScene();
+            }
+        }
+
+        //初始换场景
+        function init(target) {
+            if (objects.length) {
+                transform(objects, target, 2000);
+                return;
+            }
+            getStaff();
+            // table
+            for (var i = 0, l = staffs.length; i < l; i++) {
+                let element = createStaffDom('element', staffs[i].NAME, staffs[i].NUM);
+                var object = new THREE.CSS3DObject(element);
+                object.position.x = Math.random() * 4000 - 2000;
+                object.position.y = Math.random() * 4000 - 2000;
+                object.position.z = Math.random() * 4000 - 2000;
+                scene.add(object);
+
+                objects.push(object);
+
+                // 表格需要坐标进行排序的
+                var to = new THREE.Object3D();
+                to.position.x = (staffs[i].p_x * 140) - 1330;
+                to.position.y = -(staffs[i].p_y * 180) + 990;
+                targets.table.push(to);
+
+                //big bang
+                var bo = new THREE.Object3D();
+                bo.position.x = object.position.x + (Math.random() * 2 - 1) * 2000;
+                bo.position.y = object.position.y + (Math.random() * 2 - 1) * 1000;
+                bo.position.z = object.position.z + (Math.random() * 2 - 1) * 2000;
+                bo.rotation.x = (Math.random() * 2 - 1) * Math.PI;
+                bo.rotation.y = (Math.random() * 2 - 1) * Math.PI;
+                bo.rotation.z = (Math.random() * 2 - 1) * Math.PI;
+                targets.bang.push(bo);
+            }
+
+            // sphere
+            var vector = new THREE.Vector3();
+            var spherical = new THREE.Spherical();
+            for (var i = 0, l = objects.length; i < l; i++) {
+                var phi = Math.acos(-1 + (2 * i) / l);
+                var theta = Math.sqrt(l * Math.PI) * phi;
+                var object = new THREE.Object3D();
+                spherical.set(800, phi, theta);
+                object.position.setFromSpherical(spherical);
+                vector.copy(object.position).multiplyScalar(2);
+                object.lookAt(vector);
+                targets.sphere.push(object);
+            }
+
+            // helix
+            var vector = new THREE.Vector3();
+            var cylindrical = new THREE.Cylindrical();
+            for (var i = 0, l = objects.length; i < l; i++) {
+                var theta = i * 0.225 + Math.PI;
+                var y = -(i * 8) + 450;
+                var object = new THREE.Object3D();
+                // 参数一 圈的大小 参数二 左右间距 参数三 上下间距
+                cylindrical.set(800, theta, y);
+                object.position.setFromCylindrical(cylindrical);
+                vector.x = object.position.x * 2;
+                vector.y = object.position.y;
+                vector.z = object.position.z * 2;
+                object.lookAt(vector);
+                targets.helix.push(object);
+            }
+
+            // grid
+            for (var i = 0; i < objects.length; i++) {
+                var object = new THREE.Object3D();
+                object.position.x = ((i % 5) * 400) - 800; // 400 图片的左右间距  800 x轴中心店
+                object.position.y = (-(Math.floor(i / 5) % 5) * 300) + 500; // 500 y轴中心店
+                object.position.z = (Math.floor(i / 25)) * 200 - 800; // 300调整 片间距 800z轴中心店
+                targets.grid.push(object);
+            }
+
+            transform(objects, target || targets.helix, 2000);
+        }
+
+        function startLottery(lucky) {
+            if (lucky)
+                startAnimate(targets.helix, lucky);
+            else
+                startAnimate(targets.sphere, lucky);
+            $({
+                s: 1
+            }).animate({
+                s: 0
+            }, {
+                duration: 600,
+                step: function(n) {
+                    $('.wins').css({
+                        opacity: n,
+                        transform: `scale(${n*2}) rotateY(${n*360*2}deg)`
+                    });
+                },
+                complete: function() {
+                    $('.wins').remove();
+                }
+            });
+        }
+
+        function lottery() {
+            let w = window.innerWidth / 2 - 120 * 1.5;
+            vibrate();
+            bigBang();
+            let t = setTimeout(function() {
+                var element = createStaffDom('wins', wins[0].NAME, wins[0].NUM, 0.7);
+                document.getElementById('container').appendChild(element);
+                $({
+                    s: 0
+                }).animate({
+                    s: 1
+                }, {
+                    duration: 1500,
+                    easing: 'swing',
+                    step: function(n) {
+                        $(element).css({
+                            opacity: `${n}`,
+                            transform: `scale(${n*2}) rotateY(${n*360*2}deg)`
+                        })
+                    }
+                });
+                wins = [];
+                clearTimeout(t);
+            }, 2000)
+        }
+
+        function getStaff() {
+            let w = ['赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈', '褚', '魏', '何', '吕', '施', '张', '蒋', '沈', '韩', '杨', '宇文', '欧阳', '司马', '黄埔', '诸葛', '上官'];
+            let d = ['大锤', '钢蛋', '铁柱', '狗蛋', '臭'];
+            for (var i = 0, l = w.length; i < l; i++) {
+                for (let j = 0, m = d.length; j < m; ++j) {
+                    let num = i * j + j;
+                    staffs.push({
+                        NAME: w[i] + d[j],
+                        NUM: num
+                    });
+                    staffs[num].p_x = (num) % 15 + 1;
+                    staffs[num].p_y = Math.floor((num) / 15) + 1;
+                }
+            }
+        }
+
+        function randomStaff() {
+            let r = randomNum(0, staffs.length - 1);
+            wins.push(staffs[r]);
+            staffs.splice(r, 1);
+        }
+
+        function randomNum(a, b) {
+            switch (arguments.length) {
+                case 1:
+                    return parseInt(Math.random() * a + 1);
+                case 2:
+                    return parseInt(Math.random() * (b - a + 1) + a);
+                default:
+                    return 0;
+            }
+        }
+
+        function createStaffDom(className, staffName, id, opacity) {
+            opacity = opacity || Math.random() * 0.5 + 0.25;
+            var element = document.createElement('div');
+            element.className = className;
+            element.style.backgroundColor = 'rgba(0,127,127,' + opacity + ')';
+
+            var front = document.createElement('div');
+            front.className = 'front';
+            element.appendChild(front);
+
+            var back = document.createElement('div');
+            back.className = 'back';
+            element.appendChild(back);
+
+            var p = document.createElement('p');
+            p.innerText = staffName;
+            front.appendChild(p);
+
+            return element;
+        }
+
+        //图形变换
+        function transform(origin, targets, duration) {
+            TWEEN.removeAll();
+            for (var i = 0; i < origin.length; i++) {
+                var object = origin[i];
+                var target = targets[i];
+                new TWEEN.Tween(object.position)
+                    .to({
+                        x: target.position.x,
+                        y: target.position.y,
+                        z: target.position.z
+                    }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+                new TWEEN.Tween(object.rotation)
+                    .to({
+                        x: target.rotation.x,
+                        y: target.rotation.y,
+                        z: target.rotation.z
+                    }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+                new TWEEN.Tween(object.scale).to({
+                        x: target.scale.x,
+                        y: target.scale.y,
+                        z: target.scale.z
+                    }, Math.random() * duration + duration)
+                    .easing(TWEEN.Easing.Exponential.InOut)
+                    .start();
+            }
+            new TWEEN.Tween(this)
+                .to({}, duration * 2)
+                .onUpdate(render)
+                .start();
+        }
+
+        //监听窗体大小变化
+        function onWindowResize() {
+            if (!camera) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            render();
+        }
+
+        //维持球形
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            controls.update();
+            // 渲染循环
+            render();
+        }
+
+        //rotate the scene
+        function rotateScene() {
+            // 让场景通过x轴或者y轴旋转  & z
+            scene.rotation.x += 0.05;
+            scene.rotation.y += 0.2;
+            scene.rotation.z += 0.01;
+            rs = requestAnimationFrame(rotateScene);
+            controls.update();
+            // 渲染循环
+            render();
+        }
+
+        //rotate the scene
+        function rotateY() {
+            // 让场景通过x轴或者y轴旋转  & z
+            scene.rotation.y -= 0.001;
+            ry = requestAnimationFrame(rotateY);
+            controls.update();
+            // 渲染循环
+            render();
+        }
+
+        //抖动效果
+        function vibrate() {
+            scene.traverse(function(e) {
+                e.rotation.x += ((Math.random() * 0.1 + 0.1) * (Math.random() >= 0.5 ? 1 : -1));
+                e.rotation.y += ((Math.random() * 0.1 + 0.1) * (Math.random() >= 0.5 ? 1 : -1));
+                e.rotation.z += ((Math.random() * 0.1 + 0.1) * (Math.random() >= 0.5 ? 1 : -1));
+            });
+            vi = requestAnimationFrame(vibrate);
+        }
+
+        //球形爆炸
+        function bigBang() {
+            let t1 = setTimeout(function() {
+                cancelAnimationFrame(vi);
+                cancelAnimationFrame(rs);
+                transform(objects, targets.bang, 500);
+                let t2 = setTimeout(function() {
+                    rotateY();
+                    clearTimeout(t2);
+                }, 1000)
+                clearTimeout(t1);
+            }, 1500)
+
+        }
+
+        function render() {
+            renderer.render(scene, camera);
+        }
+    </script>
+
+</body>
+
+</html>
